@@ -3,15 +3,16 @@
 /**
  *
  * @author Jan Moritz Lindemann
+ * @author Lennart Lopin
  */
 
-namespace BitcoinPHP\BitcoinECDSA;
+namespace App\Includes;
 
 if (!extension_loaded('gmp')) {
     throw new \Exception('GMP extension seems not to be installed');
 }
 
-class BitcoinECDSA
+class MarscoinECDSA
 {
 
     public $k;
@@ -34,7 +35,7 @@ class BitcoinECDSA
                     'y' => gmp_init('32670510020758816978083085130507043184471273380659243275938904335757337482424')
                    ];
 
-        $this->networkPrefix = '00';
+        $this->networkPrefix = '32';
     }
 
     /***
@@ -86,7 +87,7 @@ class BitcoinECDSA
         if($this->networkPrefix =='6f')
             return 'ef';
         else
-           return '80';
+           return 'b2';
     }
 
     /***
@@ -384,7 +385,7 @@ class BitcoinECDSA
                               $p
                       );
 
-        // nPtY = slope * (ptX1 - nPtX) - ptY1
+        // nPtX = slope * (ptX1 - nPtX) - ptY1
         $nPt['y']   = gmp_mod(
                               gmp_sub(
                                       gmp_mul(
@@ -717,7 +718,7 @@ class BitcoinECDSA
      * @return String Base58
      */
     public function getUncompressedAddress($compressed = false, $derPubKey = null)
-    {
+    { 
         if($derPubKey !== null)
         {
             if($compressed === true) {
@@ -738,11 +739,11 @@ class BitcoinECDSA
         }
 
         $address = $this->getNetworkPrefix() . $this->hash160(hex2bin($address));
-
+     
         //checksum
         $address = $address.substr($this->hash256(hex2bin($address)), 0, 8);
         $address = $this->base58_encode($address);
-
+     
         if($this->validateAddress($address))
             return $address;
         else
@@ -790,13 +791,15 @@ class BitcoinECDSA
             }
         }
 
-        $keyhash = '00'.'14'.$this->hash160(hex2bin($pubkey));
+        $keyhash = '32'.'14'.$this->hash160(hex2bin($pubkey));
 	$address = '05'.$this->hash160(hex2bin($keyhash));
 		
 	$checksum = $this->hash256(hex2bin($address));
 	$address = $address.substr($checksum, 0, 8);
 
         $address = $this->base58_encode($address);
+
+        print_r("Address: " . $address);
 
         if($this->validateAddress($address))
             return $address;
@@ -1206,7 +1209,6 @@ class BitcoinECDSA
 
         $derPubKey = $this->getDerPubKeyWithPubKeyPoints($pubKey, $isCompressed);
 
-
         if($this->checkSignaturePoints($derPubKey, $R, $S, $hash))
             return $derPubKey;
         else
@@ -1338,28 +1340,29 @@ class BitcoinECDSA
      */
     public function checkSignatureForMessage($address, $encodedSignature, $message)
     {
-        $hash = $this->hash256("\x18Bitcoin Signed Message:\n" . $this->numToVarIntString(strlen($message)) . $message);
+        $hash = $this->hash256("\x18Bitcoin Signed Message:\n" . $this->numToVarIntString(strlen($message)). $message);
 
         //recover flag
         $signature = base64_decode($encodedSignature);
-
         $flag = hexdec(bin2hex(substr($signature, 0, 1)));
 
         $isCompressed = false;
         if($flag >= 31 & $flag < 35) //if address is compressed
         {
-            $isCompressed = true;
+           $isCompressed = true;
         }
 
         $R = bin2hex(substr($signature, 1, 32));
         $S = bin2hex(substr($signature, 33, 32));
 
         $derPubKey = $this->getPubKeyWithRS($flag, $R, $S, $hash);
-
-        if($isCompressed === true)
+        
+        if($isCompressed === true){
             $recoveredAddress = $this->getAddress($derPubKey);
-        else
+        }
+        else{
             $recoveredAddress = $this->getUncompressedAddress(false, $derPubKey);
+        }
 
         if($address === $recoveredAddress)
             return true;
